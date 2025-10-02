@@ -1,0 +1,2 @@
+python-telegram-bot==20.7
+cryptography==41.0.7
