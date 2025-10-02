@@ -10,14 +10,17 @@ import sqlite3
 import json
 import re
 from functools import wraps
+import asyncio
 
-
-# 🔐 КОНФИГУРАЦИЯ PHISHGUARD BOT
+# 🔐 КОНФИГУРАЦИЯ ДЛЯ GITHUB ACTIONS
 class PhishGuardConfig:
-    BOT_TOKEN = os.getenv('CYBER_GUARD_TOKEN', '8495458250:AAHlq0jfbZ7iOTdLjr964AnMTbFndMRgK_w')
-    ADMIN_CHAT_ID = '5924156043'
-    ENCRYPTION_KEY = os.getenv('CYBER_GUARD_KEY', Fernet.generate_key().decode())
-    JWT_SECRET = os.getenv('CYBER_GUARD_JWT', 'phishguard_secure_2024')
+    # Используем переменные окружения GitHub Actions
+    BOT_TOKEN = os.environ.get('BOT_TOKEN', '8495458250:AAHlq0jfbZ7iOTdLjr964AnMTbFndMRgK_w')
+    ADMIN_CHAT_ID = os.environ.get('ADMIN_CHAT_ID', '')
+    
+    # Ключи шифрования
+    ENCRYPTION_KEY = os.environ.get('ENCRYPTION_KEY', 'github_actions_phishguard_key_2024')
+    JWT_SECRET = os.environ.get('JWT_SECRET', 'github_actions_jwt_secret')
 
     # Лимиты для защиты от спама
     RATE_LIMITS = {
@@ -92,14 +95,13 @@ class PhishGuardBot:
 
         self.bank_phones = {
             '900': 'Сбербанк', '555': 'Тинькофф', '980': 'ЮMoney',
-            '962': 'Банк ВТБ', '495': 'Альфа-Банк', '800': 'Единый колл-центр',
-            '495': 'МТС Банк', '499': 'Газпромбанк', '495': 'Райффайзен'
+            '962': 'Банк ВТБ', '495': 'Альфа-Банк', '800': 'Единый колл-центр'
         }
 
         self.operator_codes = {
             '79': 'МегаФон', '89': 'МегаФон', '90': 'Билайн', '93': 'Билайн',
             '91': 'МТС', '98': 'МТС', '92': 'Теле2', '95': 'Теле2',
-            '96': 'Yota', '97': 'Yota', '99': 'Билайн', '92': 'Ростелеком'
+            '96': 'Yota', '97': 'Yota', '99': 'Билайн'
         }
 
     async def analyze_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -442,46 +444,53 @@ class PhishGuardBot:
             logging.error(f"Ошибка уведомления админа: {e}")
 
 
-# 🚀 ЗАПУСК БОТА
+# 🚀 ЗАПУСК БОТА ДЛЯ GITHUB ACTIONS
+async def main_async():
+    """Асинхронная функция запуска для GitHub Actions"""
+    try:
+        # Проверка токена
+        if not PhishGuardConfig.BOT_TOKEN:
+            logging.error("❌ BOT_TOKEN не установлен!")
+            return
+
+        # Настройка логирования
+        logging.basicConfig(
+            format='%(asctime)s - PHISHGUARD - %(levelname)s - %(message)s',
+            level=logging.INFO
+        )
+
+        logging.info("🛡️ Запуск PhishGuard Bot в GitHub Actions...")
+        logging.info(f"🤖 Бот: t.me/phishguard_bot")
+
+        if PhishGuardConfig.ADMIN_CHAT_ID:
+            logging.info(f"👑 Админ: {PhishGuardConfig.ADMIN_CHAT_ID}")
+        else:
+            logging.warning("⚠️ ID администратора не установлен")
+
+        # Создание приложения
+        application = Application.builder().token(PhishGuardConfig.BOT_TOKEN).build()
+        bot = PhishGuardBot()
+
+        # Регистрация обработчиков
+        application.add_handler(CommandHandler("start", bot.security_info))
+        application.add_handler(CommandHandler("phone", bot.phone_check))
+        application.add_handler(CommandHandler("security", bot.security_info))
+        application.add_handler(CommandHandler("stats", bot.admin_stats))
+        application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.analyze_message))
+
+        # Запуск бота
+        logging.info("✅ Бот успешно запущен в GitHub Actions")
+        await application.run_polling(drop_pending_updates=True)
+        
+    except Exception as e:
+        logging.error(f"❌ Ошибка: {e}")
+        # Ждем перед завершением
+        await asyncio.sleep(10)
+        raise e
+
 def main():
     """Основная функция запуска"""
-
-    # Проверка токена
-    if not PhishGuardConfig.BOT_TOKEN:
-        print("❌ Токен бота не установлен!")
-        return
-
-    # Настройка логирования
-    logging.basicConfig(
-        format='%(asctime)s - PHISHGUARD - %(levelname)s - %(message)s',
-        level=logging.INFO
-    )
-
-    print("🛡️ Запуск PhishGuard Bot...")
-    print(f"🤖 Бот: t.me/phishguard_bot")
-
-    if PhishGuardConfig.ADMIN_CHAT_ID:
-        print(f"👑 Админ: {PhishGuardConfig.ADMIN_CHAT_ID}")
-    else:
-        print("⚠️ ID администратора не установлен")
-
-    # Создание приложения
-    application = Application.builder().token(PhishGuardConfig.BOT_TOKEN).build()
-    bot = PhishGuardBot()
-
-    # Регистрация обработчиков
-    application.add_handler(CommandHandler("start", bot.security_info))
-    application.add_handler(CommandHandler("phone", bot.phone_check))
-    application.add_handler(CommandHandler("security", bot.security_info))
-    application.add_handler(CommandHandler("stats", bot.admin_stats))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, bot.analyze_message))
-
-    # Запуск бота
-    try:
-        application.run_polling(drop_pending_updates=True)
-    except Exception as e:
-        logging.critical(f"Ошибка запуска бота: {e}")
-
+    asyncio.run(main_async())
 
 if __name__ == "__main__":
     main()
