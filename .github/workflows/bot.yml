@@ -1,0 +1,31 @@
+name: 🛡️ PhishGuard Bot
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 */6 * * *'  # Автоперезапуск каждые 6 часов
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350    # Работает почти 6 часов
+    
+    steps:
+    - name: 📥 Скачать код
+      uses: actions/checkout@v3
+      
+    - name: 🐍 Установить Python
+      uses: actions/setup-python@v3
+      with:
+        python-version: '3.11'
+        
+    - name: 📦 Установить зависимости
+      run: |
+        pip install -r requirements.txt
+        
+    - name: 🚀 Запустить бота
+      env:
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        ADMIN_CHAT_ID: ${{ secrets.ADMIN_CHAT_ID }}
+      run: python main.py
